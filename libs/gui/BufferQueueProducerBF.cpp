@@ -43,7 +43,8 @@ BufferQueueProducerBF::BufferQueueProducerBF(const sp<BufferQueueCoreBF>& core) 
     mCallbackMutex(),
     mNextCallbackTicket(0),
     mCurrentCallbackTicket(0),
-    mCallbackCondition() {}
+    mCallbackCondition(),
+    mStaticGraphicBuffer(NULL) {}
 
 BufferQueueProducerBF::~BufferQueueProducerBF() {}
 
@@ -143,7 +144,6 @@ status_t BufferQueueProducerBF::dequeueBuffer(int *outSlot,
     }
 
     status_t returnFlags = NO_ERROR;
-    EGLDisplay eglDisplay = EGL_NO_DISPLAY;
     EGLSyncKHR eglFence = EGL_NO_SYNC_KHR;
     bool attachedByConsumer = false;
 
@@ -171,14 +171,11 @@ status_t BufferQueueProducerBF::dequeueBuffer(int *outSlot,
         }
 
 	mSlots[0].mAcquireCalled = false;
-	mSlots[0].mGraphicBuffer = NULL;
+	mSlots[0].mGraphicBuffer = mStaticGraphicBuffer;
 	mSlots[0].mRequestBufferCalled = false;
 	mSlots[0].mEglDisplay = EGL_NO_DISPLAY;
-	mSlots[0].mEglFence = EGL_NO_SYNC_KHR;
-	mSlots[0].mFence = Fence::NO_FENCE;
 
 
-        eglDisplay = mSlots[0].mEglDisplay;
         eglFence = mSlots[0].mEglFence;
         mSlots[0].mEglFence = EGL_NO_SYNC_KHR;
         mSlots[0].mFence = Fence::NO_FENCE;
@@ -187,25 +184,27 @@ status_t BufferQueueProducerBF::dequeueBuffer(int *outSlot,
 
         status_t error;
         BQ_LOGD("dequeueBuffer: allocating a new buffer for slot %d", *outSlot);
-        sp<GraphicBuffer> graphicBuffer(mCore->mAllocator->createGraphicBuffer(
-                    width, height, format, usage|0x80000000, &error));
-        if (graphicBuffer == NULL) {
-            BQ_LOGE("dequeueBuffer: createGraphicBuffer failed");
-            return error;
-        }
+	if(mStaticGraphicBuffer == NULL) {
+		sp<GraphicBuffer> graphicBuffer(mCore->mAllocator->createGraphicBuffer(
+					width, height, format, usage|0x80000000, &error));
+		if (graphicBuffer == NULL) {
+			BQ_LOGE("dequeueBuffer: createGraphicBuffer failed");
+			return error;
+		}
 
-        { // Autolock scope
-            Mutex::Autolock lock(mCore->mMutex);
+		{ // Autolock scope
+			Mutex::Autolock lock(mCore->mMutex);
 
-            if (mCore->mIsAbandoned) {
-                BQ_LOGE("dequeueBuffer: BufferQueue has been abandoned");
-                return NO_INIT;
-            }
+			if (mCore->mIsAbandoned) {
+				BQ_LOGE("dequeueBuffer: BufferQueue has been abandoned");
+				return NO_INIT;
+			}
 
-            mSlots[0].mFrameNumber = UINT32_MAX;
-            mSlots[0].mGraphicBuffer = graphicBuffer;
-        } // Autolock scope
-
+			mSlots[0].mFrameNumber = UINT32_MAX;
+			mSlots[0].mGraphicBuffer = graphicBuffer;
+			mStaticGraphicBuffer=graphicBuffer;
+		} // Autolock scope
+	}
 
 
     BQ_LOGD("dequeueBuffer:[SUCCESS] returning slot=%d/%" PRIu64 " buf=%p[%p] flags=%#x",
@@ -389,9 +388,9 @@ status_t BufferQueueProducerBF::queueBuffer(int slot,
 
     // Don't send the GraphicBuffer through the callback, and don't send
     // the slot number, since the consumer shouldn't need it
-    BQ_LOGD("Graphic buffer clear");
-    item.mGraphicBuffer.clear();
-    item.mSlot = BufferItem::INVALID_BUFFER_SLOT;
+    BQ_LOGD("Graphic buffer clear.");
+    //item.mGraphicBuffer.clear();
+    //item.mSlot = BufferItem::INVALID_BUFFER_SLOT;
 
     // Call back without the main BufferQueue lock held, but with the callback
     // lock held so we can ensure that callbacks occur in order
@@ -431,7 +430,7 @@ void BufferQueueProducerBF::cancelBuffer(int slot, const sp<Fence>& fence) {
         return;
     }
 
-    mSlots[0].mBufferState = BufferSlot::FREE;
+    //mSlots[0].mBufferState = BufferSlot::FREE;
     mSlots[0].mFrameNumber = 0;
     mSlots[0].mFence = fence;
     mCore->mDequeueCondition.broadcast();

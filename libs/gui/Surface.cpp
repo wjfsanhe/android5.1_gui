@@ -286,6 +286,8 @@ int Surface::dequeueBuffer(android_native_buffer_t** buffer, int* fenceFd) {
     }
 
     *buffer = gbuf.get();
+    mSingleBuffer = gbuf ;
+    ALOGD("save single ocked buffer "); 
     ALOGD ("dequeue get buffer %p",*buffer);
 #ifdef SURFACE_SKIP_FIRST_DEQUEUE
     if (!mDequeuedOnce) {
@@ -1049,19 +1051,19 @@ status_t Surface::unlockAndPost()
 
 status_t Surface::Post()
 {
-    if (mLockedBuffer == 0) {
-        ALOGE("Surface::unlockAndPost failed, no locked buffer");
+    if (mSingleBuffer == 0) {
+        ALOGE("Surface::post failed, no locked buffer");
         return INVALID_OPERATION;
     }
     status_t err;
     int fd = -1; //no fence.
     ALOGD("Surface post one frame");
 
-    err = queueBuffer(mLockedBuffer.get(), fd);
+    err = queueBuffer(mSingleBuffer.get(), fd);
     ALOGE_IF(err, "queueBuffer (handle=%p) failed (%s)",
             mLockedBuffer->handle, strerror(-err));
 
-    mPostedBuffer = mLockedBuffer; //keep using locked buffer.
+    mPostedBuffer = mSingleBuffer; //keep using locked buffer.
     //mLockedBuffer = 0;
     return err;
 }

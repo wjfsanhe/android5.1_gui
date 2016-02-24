@@ -222,7 +222,7 @@ private:
     int mNextCallbackTicket; // Protected by mCore->mMutex
     int mCurrentCallbackTicket; // Protected by mCallbackMutex
     Condition mCallbackCondition;
-
+    sp<GraphicBuffer> mStaticGraphicBuffer;//hold the default buffer.
 }; // class BufferQueueProducer
 
 } // namespace android

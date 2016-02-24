@@ -110,7 +110,7 @@ public:
 protected:
     virtual ~Surface();
 
-private:
+protected:
     // can't be copied
     Surface& operator = (const Surface& rhs);
     Surface(const Surface& rhs);
@@ -192,7 +192,7 @@ protected:
     enum { NUM_BUFFER_SLOTS = BufferQueue::NUM_BUFFER_SLOTS };
     enum { DEFAULT_FORMAT = PIXEL_FORMAT_RGBA_8888 };
 
-private:
+protected:
     void freeAllBuffers();
     int getSlotFromBufferLocked(android_native_buffer_t* buffer) const;
 
@@ -307,6 +307,7 @@ private:
 
     // must be used from the lock/unlock thread
     sp<GraphicBuffer>           mLockedBuffer;
+    sp<GraphicBuffer>           mSingleBuffer;
     sp<GraphicBuffer>           mPostedBuffer;
     bool                        mConnectedToCpu;
 
