@@ -65,6 +65,8 @@ BufferQueueCoreBF::BufferQueueCoreBF(const sp<IGraphicBufferAlloc>& allocator) :
     mBufferHasBeenQueued(false),
     mFrameCounter(0),
     mTransformHint(0),
+    mCurBufferIdx(0),
+    mBufferDequeueEnable(false),
     mIsAllocating(false),
     mIsAllocatingCondition()
 {

@@ -243,6 +243,8 @@ private:
     // false.
     bool mIsAllocating;
 
+    uint32_t mCurBufferIdx;
+    bool mBufferDequeueEnable;
     // mIsAllocatingCondition is a condition variable used by producers to wait until mIsAllocating
     // becomes false.
     mutable Condition mIsAllocatingCondition;

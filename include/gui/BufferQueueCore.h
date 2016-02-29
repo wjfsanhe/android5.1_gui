@@ -242,7 +242,6 @@ private:
     // FREE slots while this is true. mIsAllocatingCondition is signaled when this value changes to
     // false.
     bool mIsAllocating;
-
     // mIsAllocatingCondition is a condition variable used by producers to wait until mIsAllocating
     // becomes false.
     mutable Condition mIsAllocatingCondition;
