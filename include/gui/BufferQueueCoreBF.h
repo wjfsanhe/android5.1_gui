@@ -18,6 +18,7 @@
 #define ANDROID_GUI_BUFFERQUEUECOREBF_H
 
 #include <gui/BufferQueueDefs.h>
+#include <gui/VsyncMonitor.h>
 #include <gui/BufferSlot.h>
 
 #include <utils/Condition.h>
@@ -54,6 +55,7 @@ class BufferQueueCoreBF : public virtual RefBase {
 
     friend class BufferQueueProducerBF;
     friend class BufferQueueConsumerBF;
+    friend class VsyncMonitor;
 
 public:
     // Used as a placeholder slot number when the value isn't pointing to an
@@ -68,6 +70,7 @@ public:
     enum { NO_CONNECTED_API = 0 };
 
     typedef Vector<BufferItem> Fifo;
+    sp<VsyncMonitor> mVsyncMonitor; 
 
     // BufferQueueCore manages a pool of gralloc memory slots to be used by
     // producers and consumers. allocator is used to allocate all the needed
@@ -244,7 +247,7 @@ private:
     bool mIsAllocating;
 
     uint32_t mCurBufferIdx;
-    bool mBufferDequeueEnable;
+    bool mBufferEnqueueEnable;
     // mIsAllocatingCondition is a condition variable used by producers to wait until mIsAllocating
     // becomes false.
     mutable Condition mIsAllocatingCondition;

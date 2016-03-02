@@ -39,6 +39,7 @@ LOCAL_SRC_FILES:= \
 	SurfaceControl.cpp \
 	SurfaceComposerClient.cpp \
 	SyncFeatures.cpp \
+	VsyncMonitor.cpp \
 
 LOCAL_SHARED_LIBRARIES := \
 	libbinder \

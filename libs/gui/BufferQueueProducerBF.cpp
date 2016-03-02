@@ -49,7 +49,7 @@ BufferQueueProducerBF::~BufferQueueProducerBF() {}
 
 status_t BufferQueueProducerBF::requestBuffer(int slot, sp<GraphicBuffer>* buf) {
     ATRACE_CALL();
-    BQ_LOGV("requestBuffer: slot %d", slot);
+    BQ_LOGD("requestBuffer: slot %d", slot);
     Mutex::Autolock lock(mCore->mMutex);
 
     if (mCore->mIsAbandoned) {
@@ -74,7 +74,7 @@ status_t BufferQueueProducerBF::requestBuffer(int slot, sp<GraphicBuffer>* buf) 
 
 status_t BufferQueueProducerBF::setBufferCount(int bufferCount) {
     ATRACE_CALL();
-    BQ_LOGV("setBufferCount: count = %d", bufferCount);
+    BQ_LOGD("setBufferCount: count = %d", bufferCount);
 
     sp<IConsumerListener> listener;
     { // Autolock scope
@@ -140,18 +140,24 @@ status_t BufferQueueProducerBF::waitForFreeSlotThenRelock(const char* caller,
 	//we only dequeue Buffer when dequeue enable
 	//it will be disaled before exit dequeueBuffer
 	//and enable when vsync occured.
-	if (mCore->mBufferDequeueEnable){
-		if(mCore->mCurBufferIdx==0){
-			*found=0;
-		} else {
-			*found=1;
-		}
-		
-
-	} else {
-		return WOULD_BLOCK;
+	
+	switch (mCore->mCurBufferIdx){
+		case 0x00:
+		*found=0;
+		break;
+		case 0x01:
+		*found=1;		
+		break;
+		case 0x11:
+		ALOGD("first request");
+		*found=0;
+		break;
+		default :
+		ALOGD("invalid request");
+		return BAD_VALUE;
 	}
-
+	
+	ALOGD("BufferQueueBF, got buffer %d",*found);
 
 	return NO_ERROR;
 }
@@ -165,7 +171,7 @@ status_t BufferQueueProducerBF::dequeueBuffer(int *outSlot,
         mConsumerName = mCore->mConsumerName;
     } // Autolock scope
 
-    BQ_LOGV("dequeueBuffer: async=%s w=%u h=%u format=%#x, usage=%#x",
+    BQ_LOGD("dequeueBuffer: async=%s w=%u h=%u format=%#x, usage=%#x",
             async ? "true" : "false", width, height, format, usage);
 
     if ((width && !height) || (!width && height)) {
@@ -193,7 +199,9 @@ status_t BufferQueueProducerBF::dequeueBuffer(int *outSlot,
         status_t status = waitForFreeSlotThenRelock("dequeueBuffer", async,
                 &found, &returnFlags);
 
-        // This should not happen
+	if (status != NO_ERROR) {
+            return status;
+        }
 
         *outSlot = found;
         ATRACE_BUFFER_INDEX(found);
@@ -276,7 +284,7 @@ status_t BufferQueueProducerBF::dequeueBuffer(int *outSlot,
 status_t BufferQueueProducerBF::detachBuffer(int slot) {
     ATRACE_CALL();
     ATRACE_BUFFER_INDEX(slot);
-    BQ_LOGV("detachBuffer(P): slot %d", slot);
+    BQ_LOGD("detachBuffer(P): slot %d", slot);
     Mutex::Autolock lock(mCore->mMutex);
 
     if (mCore->mIsAbandoned) {
@@ -411,6 +419,16 @@ status_t BufferQueueProducerBF::queueBuffer(int slot,
     uint32_t stickyTransform;
     bool async;
     sp<Fence> fence;
+    
+	//if does not allow enqueue then return directly. 
+    if (!mCore->mBufferEnqueueEnable){
+	//man ,we will return 
+	output->inflate(mCore->mDefaultWidth, mCore->mDefaultHeight,
+                mCore->mTransformHint, mCore->mQueue.size());
+	return NO_ERROR;
+    }
+    //disable reentry between two vsync.
+    mCore->mBufferEnqueueEnable=false ;
 
     input.deflate(&timestamp, &isAutoTimestamp, &crop,
 #ifdef QCOM_BSP
@@ -509,33 +527,18 @@ status_t BufferQueueProducerBF::queueBuffer(int slot,
 
         mStickyTransform = stickyTransform;
 
-        if (mCore->mQueue.empty()) {
-            // When the queue is empty, we can ignore mDequeueBufferCannotBlock
-            // and simply queue this buffer
-            mCore->mQueue.push_back(item);
-            frameAvailableListener = mCore->mConsumerListener;
-        } else {
-            // When the queue is not empty, we need to look at the front buffer
-            // state to see if we need to replace it
-            BufferQueueCoreBF::Fifo::iterator front(mCore->mQueue.begin());
-            if (front->mIsDroppable) {
-                // If the front queued buffer is still being tracked, we first
-                // mark it as freed
-                if (mCore->stillTracking(front)) {
-                    mSlots[front->mSlot].mBufferState = BufferSlot::FREE;
-                    // Reset the frame number of the freed buffer so that it is
-                    // the first in line to be dequeued again
-                    mSlots[front->mSlot].mFrameNumber = 0;
-                }
-		 BQ_LOGE("queueBuffer******:front buffer is dropped");
-                // Overwrite the droppable buffer with the incoming one
-                *front = item;
-                frameReplacedListener = mCore->mConsumerListener;
-            } else {
-                mCore->mQueue.push_back(item);
-                frameAvailableListener = mCore->mConsumerListener;
-            }
-        }
+	if (mCore->mQueue.empty()) {
+		// When the queue is empty, we can ignore mDequeueBufferCannotBlock
+		// and simply queue this buffer
+		mCore->mQueue.push_back(item);
+		frameAvailableListener = mCore->mConsumerListener;
+	} else {
+		//clear all ,then push 
+		
+		mCore->mQueue.clear();
+		mCore->mQueue.push_back(item);
+		frameAvailableListener = mCore->mConsumerListener;
+	}
 
         mCore->mBufferHasBeenQueued = true;
         mCore->mDequeueCondition.broadcast();
@@ -570,13 +573,16 @@ status_t BufferQueueProducerBF::queueBuffer(int slot,
         while (callbackTicket != mCurrentCallbackTicket) {
             mCallbackCondition.wait(mCallbackMutex);
         }
+	
+	//request next vsyc ,we need vsync to sync pace.
+	mCore->mVsyncMonitor->requestNextVsync();
 
         if (frameAvailableListener != NULL) {
             frameAvailableListener->onFrameAvailable(item);
         } else if (frameReplacedListener != NULL) {
             frameReplacedListener->onFrameReplaced(item);
         }
-
+	 BQ_LOGD("queueBufferBF:requestNextVsync and onFramexxx listener is called ");
         ++mCurrentCallbackTicket;
         mCallbackCondition.broadcast();
     }

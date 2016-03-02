@@ -19,6 +19,7 @@
 //#define LOG_NDEBUG 0
 
 #include <gui/BufferQueueBF.h>
+#include <gui/VsyncMonitor.h>
 #include <gui/BufferQueueConsumerBF.h>
 #include <gui/BufferQueueCoreBF.h>
 #include <gui/BufferQueueProducerBF.h>
@@ -74,6 +75,13 @@ void BufferQueueBF::createBufferQueue(sp<IGraphicBufferProducer>* outProducer,
     sp<IGraphicBufferConsumer> consumer(new BufferQueueConsumerBF(core));
     LOG_ALWAYS_FATAL_IF(consumer == NULL,
             "BufferQueueBF: failed to create BufferQueueConsumer");
+    
+   //add VsyncMonitor to BufferQueueCore.
+    core->mVsyncMonitor = new VsyncMonitor(core);
+     core->mVsyncMonitor->Init();
+    LOG_ALWAYS_FATAL_IF(core->mVsyncMonitor == NULL,
+            "BufferQueueBF: failed to create VsyncMonitor");
+    
 
     *outProducer = producer;
     *outConsumer = consumer;
