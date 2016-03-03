@@ -78,7 +78,7 @@ void BufferQueueBF::createBufferQueue(sp<IGraphicBufferProducer>* outProducer,
     
    //add VsyncMonitor to BufferQueueCore.
     core->mVsyncMonitor = new VsyncMonitor(core);
-     core->mVsyncMonitor->Init();
+    //core->mVsyncMonitor->Init();
     LOG_ALWAYS_FATAL_IF(core->mVsyncMonitor == NULL,
             "BufferQueueBF: failed to create VsyncMonitor");
     
