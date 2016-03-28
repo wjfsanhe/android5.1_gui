@@ -107,6 +107,8 @@ private:
     // count. The count must be between 2 and NUM_BUFFER_SLOTS, inclusive. The
     // initial default is 2.
     status_t setDefaultMaxBufferCountLocked(int count);
+	
+    bool isInVRMode() const;
 
     // freeBufferLocked frees the GraphicBuffer and sync resources for the
     // given slot.

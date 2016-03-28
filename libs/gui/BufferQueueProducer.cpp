@@ -379,7 +379,7 @@ status_t BufferQueueProducer::dequeueBuffer(int *outSlot,
         eglDestroySyncKHR(eglDisplay, eglFence);
     }
 
-    BQ_LOGV("dequeueBuffer: returning slot=%d/%" PRIu64 " buf=%p flags=%#x",
+    BQ_LOGD("dequeueBuffer: returning slot=%d/%" PRIu64 " buf=%p flags=%#x",
             *outSlot,
             mSlots[*outSlot].mFrameNumber,
             mSlots[*outSlot].mGraphicBuffer->handle, returnFlags);
@@ -603,6 +603,15 @@ status_t BufferQueueProducer::queueBuffer(int slot,
             return BAD_VALUE;
         }
 
+	if (mCore->isInVRMode()) {
+		//drop this slot and return directly.
+        	mSlots[slot].mFence = Fence::NO_FENCE;
+        	mSlots[slot].mBufferState = BufferSlot::FREE;
+        	output->inflate(mCore->mDefaultWidth, mCore->mDefaultHeight,
+                mCore->mTransformHint, mCore->mQueue.size());
+		return NO_ERROR;
+	} 
+			
         mSlots[slot].mFence = fence;
         mSlots[slot].mBufferState = BufferSlot::QUEUED;
         ++mCore->mFrameCounter;

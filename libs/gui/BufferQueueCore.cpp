@@ -29,6 +29,8 @@
 #include <gui/IProducerListener.h>
 #include <gui/ISurfaceComposer.h>
 #include <private/gui/ComposerService.h>
+#include <cutils/properties.h>
+
 
 template <typename T>
 static inline T max(T a, T b) { return a > b ? a : b; }
@@ -78,6 +80,13 @@ BufferQueueCore::BufferQueueCore(const sp<IGraphicBufferAlloc>& allocator) :
 }
 
 BufferQueueCore::~BufferQueueCore() {}
+
+bool BufferQueueCore::isInVRMode() const {
+	char value[PROPERTY_VALUE_MAX];
+	property_get("sf.vrmode", value, "0");	
+	BQ_LOGD("sf.vrmode: %s",value);
+	return (atoi(value) > 0)?true:false;
+}
 
 void BufferQueueCore::dump(String8& result, const char* prefix) const {
     Mutex::Autolock lock(mMutex);

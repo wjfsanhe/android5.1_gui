@@ -29,29 +29,65 @@ int receiver(int fd, int events, void* data)
 {
     sp<SensorEventQueue> q((SensorEventQueue*)data);
     ssize_t n;
-    ASensorEvent buffer[8];
+    ASensorEvent buffer[20];
 
-    static nsecs_t oldTimeStamp = 0;
+    static nsecs_t oldTimeStamp[3] = {0};
 
-    while ((n = q->read(buffer, 8)) > 0) {
+    while ((n = q->read(buffer, 20)) > 0) {
         for (int i=0 ; i<n ; i++) {
             float t;
-            if (oldTimeStamp) {
-                t = float(buffer[i].timestamp - oldTimeStamp) / s2ns(1);
-            } else {
-                t = float(buffer[i].timestamp - sStartTime) / s2ns(1);
-            }
-            oldTimeStamp = buffer[i].timestamp;
 
-            if (buffer[i].type == Sensor::TYPE_ACCELEROMETER) {
-                printf("%lld\t%8f\t%8f\t%8f\t%f\n",
-                        buffer[i].timestamp,
+	    if (buffer[i].type == Sensor::TYPE_ACCELEROMETER) {
+		    if (oldTimeStamp[0]) {
+			    t = float(buffer[i].timestamp - oldTimeStamp[0]) / s2ns(1);
+		    } else {
+			    t = float(buffer[i].timestamp - sStartTime) / s2ns(1);
+		    }
+		    oldTimeStamp[0] = buffer[i].timestamp;
+		    printf("AAAAA :[%f - %f]\t%8f\t%8f\t%8f\t%f\n",
+				    t*1000,float(systemTime()-buffer[i].timestamp)/ s2ns(1)*1000,
+				    buffer[i].data[0], buffer[i].data[1], buffer[i].data[2],
+				    1.0/t);
+	    }
+	    
+            if (buffer[i].type == Sensor::TYPE_GYROSCOPE) {
+		
+		    if (oldTimeStamp[1]) {
+			    t = float(buffer[i].timestamp - oldTimeStamp[1]) / s2ns(1);
+		    } else {
+			    t = float(buffer[i].timestamp - sStartTime) / s2ns(1);
+		    }
+		    oldTimeStamp[1] = buffer[i].timestamp;
+                printf("GGGGG :[%f - %f]\t%8f\t%8f\t%8f\t%f\n",
+                        t*1000,float(systemTime()-buffer[i].timestamp)/ s2ns(1)*1000,
                         buffer[i].data[0], buffer[i].data[1], buffer[i].data[2],
                         1.0/t);
             }
 
+            if (buffer[i].type == Sensor::TYPE_MAGNETIC_FIELD) {
+
+
+		    if (oldTimeStamp[2]) {
+			    t = float(buffer[i].timestamp - oldTimeStamp[2]) / s2ns(1);
+		    } else {
+			    t = float(buffer[i].timestamp - sStartTime) / s2ns(1);
+		    }
+		    oldTimeStamp[2] = buffer[i].timestamp;
+                printf("MMMMM :[%f - %f]\t%8f\t%8f\t%8f\t%f\n",
+                        t*1000,float(systemTime()-buffer[i].timestamp)/ s2ns(1)*1000,
+                        buffer[i].data[0], buffer[i].data[1], buffer[i].data[2],
+                        1.0/t);
+            }
+
+
         }
     }
+	float cur=systemTime();
+	static float old=0.0;	
+	printf("%f----%f\n\n",cur/s2ns(1),(cur-old)/s2ns(1)*1000.0);
+	old=cur;
+
+
     if (n<0 && n != -EAGAIN) {
         printf("error reading events (%s)\n", strerror(-n));
     }
@@ -71,14 +107,26 @@ int main(int argc, char** argv)
     printf("queue=%p\n", q.get());
 
     Sensor const* accelerometer = mgr.getDefaultSensor(Sensor::TYPE_ACCELEROMETER);
+    Sensor const* gero = mgr.getDefaultSensor(Sensor::TYPE_GYROSCOPE);
+    Sensor const* magic = mgr.getDefaultSensor(Sensor::TYPE_MAGNETIC_FIELD);
     printf("accelerometer=%p (%s)\n",
             accelerometer, accelerometer->getName().string());
 
+    printf("accelerometer=%p (%s)\n",
+           	gero, gero->getName().string());
+
+    printf("magic=%p (%s)\n",
+           	magic, magic->getName().string());
+
     sStartTime = systemTime();
 
-    q->enableSensor(accelerometer);
+    //q->enableSensor(accelerometer);
+    q->enableSensor(gero);
+    //q->enableSensor(magic);
 
     q->setEventRate(accelerometer, ms2ns(10));
+    q->setEventRate(gero, ms2ns(10));
+    q->setEventRate(magic, ms2ns(10));
 
     sp<Looper> loop = new Looper(false);
     loop->addFd(q->getFd(), 0, ALOOPER_EVENT_INPUT, receiver, q.get());
